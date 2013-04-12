@@ -22,7 +22,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifndef _WIN32
 #include <unistd.h>
+#else
+#include <io.h>
+#define STDIN_FILENO 0
+#endif
+
 #include <freerdp/settings.h>
 #include <freerdp/utils/print.h>
 #include <freerdp/utils/memory.h>
