@@ -96,12 +96,30 @@ BOOL rdp_read_client_auto_reconnect_cookie(wStream* s, rdpSettings* settings)
 void rdp_write_client_auto_reconnect_cookie(wStream* s, rdpSettings* settings)
 {
 	ARC_CS_PRIVATE_PACKET* autoReconnectCookie;
+	CryptoHmac hmac;
+	BYTE cryptSecurityVerifier[16];
+	BYTE zeros[32];
+
 	autoReconnectCookie = settings->ClientAutoReconnectCookie;
+	
+	/* SecurityVerifier = HMAC(AutoReconnectRandom, ClientRandom) */
+	hmac = crypto_hmac_new();
+	crypto_hmac_md5_init(hmac, autoReconnectCookie->securityVerifier, 16);
+	
+	if (settings->ClientRandomLength > 0) {
+		crypto_hmac_update(hmac, settings->ClientRandom, settings->ClientRandomLength);
+	} else {
+		/* use 16 zeros */
+		ZeroMemory(zeros, sizeof(zeros));
+		crypto_hmac_update(hmac, zeros, sizeof(zeros));
+	}
+
+	crypto_hmac_final(hmac, cryptSecurityVerifier, 16);
 
 	Stream_Write_UINT32(s, autoReconnectCookie->cbLen); /* cbLen (4 bytes) */
 	Stream_Write_UINT32(s, autoReconnectCookie->version); /* version (4 bytes) */
 	Stream_Write_UINT32(s, autoReconnectCookie->logonId); /* LogonId (4 bytes) */
-	Stream_Write(s, autoReconnectCookie->securityVerifier, 16); /* SecurityVerifier */
+	Stream_Write(s, cryptSecurityVerifier, 16); /* SecurityVerifier */
 }
 
 /**

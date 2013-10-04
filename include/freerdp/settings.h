@@ -791,11 +791,13 @@ struct rdp_settings
 	ALIGN64 UINT32 EncryptionMethods; /* 193 */
 	ALIGN64 UINT32 ExtEncryptionMethods; /* 194 */
 	ALIGN64 UINT32 EncryptionLevel; /* 195 */
-	ALIGN64 BYTE* ServerRandom; /* 196 */
-	ALIGN64 DWORD ServerRandomLength; /* 197 */
-	ALIGN64 BYTE* ServerCertificate; /* 198 */
-	ALIGN64 DWORD ServerCertificateLength; /* 199 */
-	UINT64 padding0256[256 - 200]; /* 200 */
+	ALIGN64 BYTE* ClientRandom; /* 196 */
+	ALIGN64 DWORD ClientRandomLength; /* 197 */
+	ALIGN64 BYTE* ServerRandom; /* 198 */
+	ALIGN64 DWORD ServerRandomLength; /* 199 */
+	ALIGN64 BYTE* ServerCertificate; /* 200 */
+	ALIGN64 DWORD ServerCertificateLength; /* 201 */
+	UINT64 padding0256[256 - 202]; /* 202 */
 
 	/* Client Network Data */
 	ALIGN64 UINT32 ChannelCount; /* 256 */
