@@ -43,12 +43,35 @@
 #define AVMEDIA_TYPE_AUDIO 1
 #endif
 
+#if LIBAVCODEC_VERSION_MAJOR < 54
+#define MAX_AUDIO_FRAME_SIZE AVCODEC_MAX_AUDIO_FRAME_SIZE
+#else
+#define MAX_AUDIO_FRAME_SIZE 192000
+#endif
+
+#if LIBAVCODEC_VERSION_MAJOR < 55
+#define AV_CODEC_ID_VC1 CODEC_ID_VC1
+#define AV_CODEC_ID_WMAV2 CODEC_ID_WMAV2
+#define AV_CODEC_ID_WMAPRO CODEC_ID_WMAPRO
+#define AV_CODEC_ID_MP3 CODEC_ID_MP3
+#define AV_CODEC_ID_MP2 CODEC_ID_MP2
+#define AV_CODEC_ID_MPEG2VIDEO CODEC_ID_MPEG2VIDEO
+#define AV_CODEC_ID_WMV3 CODEC_ID_WMV3
+#define AV_CODEC_ID_AAC CODEC_ID_AAC
+#define AV_CODEC_ID_H264 CODEC_ID_H264
+#define AV_CODEC_ID_AC3 CODEC_ID_AC3
+#endif
+
 typedef struct _TSMFFFmpegDecoder
 {
 	ITSMFDecoder iface;
 
 	int media_type;
+#if LIBAVCODEC_VERSION_MAJOR < 55
 	enum CodecID codec_id;
+#else
+	enum AVCodecID codec_id;
+#endif
 	AVCodecContext* codec_context;
 	AVCodec* codec;
 	AVFrame* frame;
@@ -97,7 +120,7 @@ static BOOL tsmf_ffmpeg_init_audio_stream(ITSMFDecoder* decoder, const TS_AM_MED
 	mdecoder->codec_context->bit_rate = media_type->BitRate;
 	mdecoder->codec_context->channels = media_type->Channels;
 	mdecoder->codec_context->block_align = media_type->BlockAlign;
-
+#if LIBAVCODEC_VERSION_MAJOR < 55
 #ifdef AV_CPU_FLAG_SSE2
 	mdecoder->codec_context->dsp_mask = AV_CPU_FLAG_SSE2 | AV_CPU_FLAG_MMX2;
 #else
@@ -107,7 +130,13 @@ static BOOL tsmf_ffmpeg_init_audio_stream(ITSMFDecoder* decoder, const TS_AM_MED
 	mdecoder->codec_context->dsp_mask = FF_MM_SSE2 | FF_MM_MMX2;
 #endif
 #endif
-
+#else  /* LIBAVCODEC_VERSION_MAJOR < 55 */
+#ifdef AV_CPU_FLAG_SSE2
+	av_set_cpu_flags_mask(AV_CPU_FLAG_SSE2 | AV_CPU_FLAG_MMX2);
+#else
+	av_set_cpu_flags_mask(FF_MM_SSE2 | FF_MM_MMX2);
+#endif
+#endif /* LIBAVCODEC_VERSION_MAJOR < 55 */
 	return TRUE;
 }
 
@@ -216,28 +245,28 @@ static BOOL tsmf_ffmpeg_set_format(ITSMFDecoder* decoder, TS_AM_MEDIA_TYPE* medi
 	switch (media_type->SubType)
 	{
 		case TSMF_SUB_TYPE_WVC1:
-			mdecoder->codec_id = CODEC_ID_VC1;
+			mdecoder->codec_id = AV_CODEC_ID_VC1;
 			break;
 		case TSMF_SUB_TYPE_WMA2:
-			mdecoder->codec_id = CODEC_ID_WMAV2;
+			mdecoder->codec_id = AV_CODEC_ID_WMAV2;
 			break;
 		case TSMF_SUB_TYPE_WMA9:
-			mdecoder->codec_id = CODEC_ID_WMAPRO;
+			mdecoder->codec_id = AV_CODEC_ID_WMAPRO;
 			break;
 		case TSMF_SUB_TYPE_MP3:
-			mdecoder->codec_id = CODEC_ID_MP3;
+			mdecoder->codec_id = AV_CODEC_ID_MP3;
 			break;
 		case TSMF_SUB_TYPE_MP2A:
-			mdecoder->codec_id = CODEC_ID_MP2;
+			mdecoder->codec_id = AV_CODEC_ID_MP2;
 			break;
 		case TSMF_SUB_TYPE_MP2V:
-			mdecoder->codec_id = CODEC_ID_MPEG2VIDEO;
+			mdecoder->codec_id = AV_CODEC_ID_MPEG2VIDEO;
 			break;
 		case TSMF_SUB_TYPE_WMV3:
-			mdecoder->codec_id = CODEC_ID_WMV3;
+			mdecoder->codec_id = AV_CODEC_ID_WMV3;
 			break;
 		case TSMF_SUB_TYPE_AAC:
-			mdecoder->codec_id = CODEC_ID_AAC;
+			mdecoder->codec_id = AV_CODEC_ID_AAC;
 			/* For AAC the pFormat is a HEAACWAVEINFO struct, and the codec data
 			   is at the end of it. See
 			   http://msdn.microsoft.com/en-us/library/dd757806.aspx */
@@ -249,10 +278,10 @@ static BOOL tsmf_ffmpeg_set_format(ITSMFDecoder* decoder, TS_AM_MEDIA_TYPE* medi
 			break;
 		case TSMF_SUB_TYPE_H264:
 		case TSMF_SUB_TYPE_AVC1:
-			mdecoder->codec_id = CODEC_ID_H264;
+			mdecoder->codec_id = AV_CODEC_ID_H264;
 			break;
 		case TSMF_SUB_TYPE_AC3:
-			mdecoder->codec_id = CODEC_ID_AC3;
+			mdecoder->codec_id = AV_CODEC_ID_AC3;
 			break;
 		default:
 			return FALSE;
@@ -351,7 +380,7 @@ static BOOL tsmf_ffmpeg_decode_audio(ITSMFDecoder* decoder, const BYTE* data, UI
 #endif
 
 	if (mdecoder->decoded_size_max == 0)
-		mdecoder->decoded_size_max = AVCODEC_MAX_AUDIO_FRAME_SIZE + 16;
+		mdecoder->decoded_size_max = MAX_AUDIO_FRAME_SIZE + 16;
 	mdecoder->decoded_data = malloc(mdecoder->decoded_size_max);
 	ZeroMemory(mdecoder->decoded_data, mdecoder->decoded_size_max);
 	/* align the memory for SSE2 needs */
@@ -363,7 +392,7 @@ static BOOL tsmf_ffmpeg_decode_audio(ITSMFDecoder* decoder, const BYTE* data, UI
 	while (src_size > 0)
 	{
 		/* Ensure enough space for decoding */
-		if (mdecoder->decoded_size_max - mdecoder->decoded_size < AVCODEC_MAX_AUDIO_FRAME_SIZE)
+		if (mdecoder->decoded_size_max - mdecoder->decoded_size < MAX_AUDIO_FRAME_SIZE)
 		{
 			mdecoder->decoded_size_max = mdecoder->decoded_size_max * 2 + 16;
 			mdecoder->decoded_data = realloc(mdecoder->decoded_data, mdecoder->decoded_size_max);
