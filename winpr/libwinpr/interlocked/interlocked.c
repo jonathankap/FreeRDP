@@ -240,7 +240,11 @@ LONG InterlockedCompareExchange(LONG volatile *Destination, LONG Exchange, LONG 
 
 /* InterlockedCompareExchange64 already defined */
 
-#elif (_WIN32 && (_WIN32_WINNT < 0x0502))
+#elif (_WIN32 && (_WIN32_WINNT >= 0x0501))
+
+/* InterlockedCompareExchange already defined */
+
+#elif (_WIN32 && (_WIN32_WINNT < 0x0501))
 
 static volatile HANDLE mutex = NULL;
 
